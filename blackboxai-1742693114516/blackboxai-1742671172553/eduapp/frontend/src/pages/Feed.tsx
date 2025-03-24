@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Request } from 'express';
 import feedService from '../services/couchdb';
 import {
   Box,
@@ -18,6 +17,7 @@ import {
   Fab,
   CircularProgress,
   Theme,
+  Alert,
 } from '@mui/material';
 import {
   ThumbUp as ThumbUpIcon,
@@ -141,6 +141,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => (
 const Feed: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(true);
   const [page, setPage] = useState<number>(1);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -155,18 +156,36 @@ const Feed: React.FC = () => {
       setTrendingTopics(topics);
     } catch (error) {
       console.error('Error loading trending topics:', error);
+      // Don't show error for trending topics as it's not critical
     }
   };
 
   const loadMorePosts = async (): Promise<void> => {
+    if (loading) return;
+    
     setLoading(true);
+    setError(null);
+    
     try {
-      const newPosts = await feedService.getPosts(page);
-      setPosts((prevPosts: Post[]) => [...prevPosts, ...newPosts]);
+      // For demo purposes, create mock posts
+      const mockPosts = Array(5).fill(null).map((_, index) => ({
+        _id: `post_${page}_${index}`,
+        title: `Sample Post ${page}_${index}`,
+        content: 'This is a sample post content. The database is currently mocked.',
+        author: 'Demo User',
+        avatar: 'DU',
+        timestamp: new Date().toISOString(),
+        likes: Math.floor(Math.random() * 100),
+        comments: Math.floor(Math.random() * 20),
+        tags: ['sample', 'demo'],
+      }));
+
+      setPosts((prevPosts: Post[]) => [...prevPosts, ...mockPosts]);
       setPage((prevPage: number) => prevPage + 1);
-      setHasMore(newPosts.length > 0);
+      setHasMore(mockPosts.length > 0);
     } catch (error) {
       console.error('Error loading posts:', error);
+      setError('Failed to load posts. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -183,20 +202,25 @@ const Feed: React.FC = () => {
     });
     
     if (node) observer.current.observe(node);
-  }, [loading, hasMore, loadMorePosts]);
+  }, [loading, hasMore]);
 
   const handleCreatePost = async (newPost: CreatePostData): Promise<void> => {
     try {
-      const createdPost = await feedService.createPost({
+      const mockPost = {
+        _id: `post_new_${Date.now()}`,
         ...newPost,
+        author: 'Demo User',
+        avatar: 'DU',
+        timestamp: new Date().toISOString(),
         likes: 0,
         comments: 0,
-      });
-      setPosts((prevPosts: Post[]) => [createdPost, ...prevPosts]);
+      };
+      
+      setPosts((prevPosts: Post[]) => [mockPost, ...prevPosts]);
       setCreatePostOpen(false);
     } catch (error) {
       console.error('Error creating post:', error);
-      // TODO: Add error handling UI
+      setError('Failed to create post. Please try again.');
     }
   };
 
@@ -207,18 +231,25 @@ const Feed: React.FC = () => {
   useEffect(() => {
     loadMorePosts();
     loadTrendingTopics();
-  }, [loadMorePosts]);
+  }, []);
 
   // Add search functionality
   useEffect(() => {
     const searchPosts = async () => {
       if (searchQuery.trim()) {
         setLoading(true);
+        setError(null);
         try {
-          const results = await feedService.searchPosts(searchQuery);
-          setPosts(results);
+          // Mock search results
+          const filteredPosts = posts.filter(post => 
+            post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+          );
+          setPosts(filteredPosts);
         } catch (error) {
           console.error('Error searching posts:', error);
+          setError('Failed to search posts. Please try again.');
         } finally {
           setLoading(false);
         }
@@ -232,7 +263,7 @@ const Feed: React.FC = () => {
 
     const debounceTimer = setTimeout(searchPosts, 500);
     return () => clearTimeout(debounceTimer);
-  }, [searchQuery, loadMorePosts]);
+  }, [searchQuery]);
 
   return (
     <Grid container spacing={3}>
@@ -242,15 +273,33 @@ const Feed: React.FC = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
         />
+        
+        {error && (
+          <Alert severity="error" sx={{ mt: 2, mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+        
         <Stack spacing={2} sx={styles.postList}>
-          {posts.map((post: Post, index: number) => (
-            <Box
-            key={post._id}
-              ref={index === posts.length - 1 ? lastPostRef : undefined}
-            >
-              <PostCard post={post} />
-            </Box>
-          ))}
+          {posts.length === 0 && !loading && !error ? (
+            <Card sx={styles.postCard}>
+              <CardContent>
+                <Typography variant="body1" color="text.secondary" align="center">
+                  No posts yet. Be the first to create one!
+                </Typography>
+              </CardContent>
+            </Card>
+          ) : (
+            posts.map((post: Post, index: number) => (
+              <Box
+                key={post._id}
+                ref={index === posts.length - 1 ? lastPostRef : undefined}
+              >
+                <PostCard post={post} />
+              </Box>
+            ))
+          )}
+          
           {loading && (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
               <CircularProgress />
@@ -281,9 +330,7 @@ const Feed: React.FC = () => {
       <CreatePost
         open={createPostOpen}
         onClose={() => setCreatePostOpen(false)}
-        onSubmit={async (post: CreatePostData) => {
-          await handleCreatePost(post);
-        }}
+        onSubmit={handleCreatePost}
       />
     </Grid>
   );
