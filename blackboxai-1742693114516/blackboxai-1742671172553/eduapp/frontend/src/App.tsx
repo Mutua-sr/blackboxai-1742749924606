@@ -3,10 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Login from './components/auth/Login';
+import Login from './pages/Login';
 import Feed from './pages/Feed';
 import Classrooms from './pages/Classrooms';
 import ChatRoom from './pages/ChatRoom';
+import MainLayout from './components/layout/MainLayout';
 
 // Create theme instance
 const theme = createTheme({
@@ -33,15 +34,36 @@ const theme = createTheme({
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <MainLayout>{children}</MainLayout>;
+};
+
+// Public Route Component
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 const AppRoutes = () => {
-  const { login } = useAuth();
-
   return (
     <Routes>
-      <Route path="/login" element={<Login onLogin={login} />} />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
+      />
       <Route
         path="/"
         element={
@@ -66,6 +88,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
