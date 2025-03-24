@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
-  const navigate = useNavigate();
+  const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
@@ -22,10 +22,8 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // TODO: Implement actual authentication
-      console.log('Form submitted:', formData);
-      // For now, just redirect to feed
-      navigate('/feed');
+      await login(formData.email, formData.password);
+      // AuthContext will handle the redirection after successful login
     } catch (error) {
       console.error('Authentication error:', error);
     }
@@ -79,6 +77,7 @@ const Login: React.FC = () => {
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
+                  autoComplete="email"
                 />
               </div>
 
@@ -94,6 +93,7 @@ const Login: React.FC = () => {
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   required
+                  autoComplete="current-password"
                 />
               </div>
 
